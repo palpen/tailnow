@@ -1,20 +1,19 @@
 # Tailnow (Self-Hosted Agent Hosting)
 
-A private, self-hosted version of an instant static-site publisher (like `here.now`) built specifically for your Tailscale network. 
+A private, self-hosted static site publisher for your Tailscale network. 
 
 ## Features
-- **Private:** Completely invisible to the public internet. Only devices authenticated on your Tailnet can see or publish sites.
-- **Cross-Agent:** Works seamlessly with Claude Code, OpenClaw, Cursor, or any other agent that can run a bash script.
-- **Zero Config:** Uses `tailscale serve` to instantly bind the port and handle SSL/auth.
+- **Zero Client Scripts:** No scripts to download or install on your other machines. Agents use standard `zip` and `curl`.
+- **Private:** Completely invisible to the public internet. Only devices on your Tailnet can access it.
+- **Cross-Agent:** Works seamlessly with Claude Code, OpenClaw, Cursor, or any other agent.
 
 ---
 
-## 1. Setting up the Server (Host Machine)
+## 1. Start the Server (Host Machine)
 
 Clone this repository to the machine that will host your sites (e.g., your Mac Mini).
 
 ```bash
-cd tailnow
 npm install
 npm start
 ```
@@ -27,22 +26,17 @@ tailscale serve --bg 8080
 
 ---
 
-## 2. Using the Client (Your Laptop / Agents)
+## 2. Deploy from Any Agent (No Setup Required)
 
-On any *other* computer connected to your Tailnet (like your laptop running Claude Code), download the `publish.sh` script. 
+On your laptop (or any other machine), you don't need to install anything. Since AI agents already know how to use `zip` and `curl`, you just give them the endpoint.
 
-When you ask your agent to build a static site, give it these instructions:
-1. "Build the app into a folder (like `./dist` or `./public`)."
-2. "Run `./publish.sh <tailscale-machine-name> <project-name> <folder>`"
+Tell your agent:
+> "Build the app, zip the output folder, and curl it to `http://selenes-mac-mini:8080/api/publish/my-app`"
 
-### Example Usage
-
+**The standard command the agent will run:**
 ```bash
-chmod +x publish.sh
-
-# Deploy the "snake-game" folder to your Tailscale server
-./publish.sh http://selenes-mac-mini snake-game ./snake-game
+cd dist && zip -r -q site.zip . && curl -F "file=@site.zip" http://selenes-mac-mini:8080/api/publish/my-app && rm site.zip
 ```
 
-The script will zip the folder, push it securely across your Tailnet to the server, and extract it instantly. Your site will immediately be live at:
-`http://selenes-mac-mini/snake-game/`
+The server instantly unzips the payload and serves it. Your site immediately goes live at:
+`http://selenes-mac-mini/my-app/`

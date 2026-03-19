@@ -3,6 +3,7 @@ const multer = require('multer');
 const AdmZip = require('adm-zip');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -14,8 +15,9 @@ if (!fs.existsSync(SITES_DIR)) {
 }
 
 // SECURITY: Limit upload size to 100MB to prevent DoS via disk exhaustion
+// Use OS temp directory instead of local uploads/ folder to keep the app clean
 const upload = multer({ 
-    dest: 'uploads/',
+    dest: os.tmpdir(),
     limits: { fileSize: 100 * 1024 * 1024 } 
 });
 
@@ -24,29 +26,36 @@ app.use(express.static(SITES_DIR));
 
 // API Endpoint to publish a new site
 app.post('/api/publish/:project', upload.single('file'), (req, res) => {
-    const project = req.params.project;
+    const { project } = req.params;
+    const file = req.file;
+
+    // Helper to safely clean up uploaded files
+    const cleanupFile = () => {
+        if (file && fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+        }
+    };
     
-    // SECURITY: Strict regex to prevent Directory Traversal attacks (e.g., passing "../../etc")
-    if (!/^[a-zA-Z0-9_-]+$/.test(project)) {
-        if (req.file) fs.unlinkSync(req.file.path);
-        return res.status(400).json({ error: 'Invalid project name. Only alphanumeric, hyphens, and underscores allowed.' });
+    if (!file) {
+        return res.status(400).json({ error: 'No zip file provided' });
     }
 
-    if (!req.file) {
-        return res.status(400).json({ error: 'No zip file provided' });
+    // SECURITY: Strict regex to prevent Directory Traversal attacks
+    if (!/^[a-zA-Z0-9_-]+$/.test(project)) {
+        cleanupFile();
+        return res.status(400).json({ error: 'Invalid project name. Only alphanumeric, hyphens, and underscores allowed.' });
     }
 
     const projectDir = path.join(SITES_DIR, project);
 
     try {
-        const zip = new AdmZip(req.file.path);
+        const zip = new AdmZip(file.path);
         
-        // SECURITY: Zip Slip Prevention. Ensure no file in the zip tries to navigate up directories.
-        const zipEntries = zip.getEntries();
-        for (const entry of zipEntries) {
+        // SECURITY: Zip Slip Prevention
+        for (const entry of zip.getEntries()) {
             if (entry.entryName.includes('..')) {
-                fs.unlinkSync(req.file.path);
-                return res.status(400).json({ error: 'Security violation: Zip Slip attempt detected (path traversal within zip).' });
+                cleanupFile();
+                return res.status(400).json({ error: 'Security violation: Zip Slip attempt detected.' });
             }
         }
 
@@ -57,19 +66,17 @@ app.post('/api/publish/:project', upload.single('file'), (req, res) => {
 
         // Extract the uploaded zip file
         zip.extractAllTo(projectDir, true);
-
-        // Clean up the uploaded zip file
-        fs.unlinkSync(req.file.path);
+        cleanupFile();
 
         res.json({
             success: true,
-            project: project,
+            project,
             message: `Successfully published to /${project}`,
             url: `https://${req.headers.host}/${project}/`
         });
     } catch (err) {
         console.error('Error publishing site:', err);
-        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        cleanupFile();
         res.status(500).json({ error: 'Failed to extract and publish site' });
     }
 });
@@ -77,6 +84,5 @@ app.post('/api/publish/:project', upload.single('file'), (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Tailnow server running at http://localhost:${PORT}`);
     console.log(`📁 Hosting files from: ${SITES_DIR}`);
-    console.log(`\nTo expose this to your Tailnet, run:`);
-    console.log(`tailscale serve --bg ${PORT}`);
+    console.log(`\nTo expose this to your Tailnet, run:\ntailscale serve --bg ${PORT}`);
 });

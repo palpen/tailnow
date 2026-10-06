@@ -1,14 +1,17 @@
 {
   "name": "tailnow",
-  "version": "1.0.0",
-  "description": "A private, Tailscale-only static site hosting tool for AI agents.",
+  "version": "2.0.0",
+  "private": true,
+  "description": "A private Tailscale app publisher and directory.",
   "main": "server.js",
+  "engines": { "node": ">=24.21.0 <25" },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "adm-zip": "^0.5.10",
-    "express": "^4.18.2",
-    "multer": "^1.4.5-lts.1"
+    "adm-zip": "0.6.1",
+    "express": "5.2.1",
+    "multer": "2.4.0"
   }
 }

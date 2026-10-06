@@ -1,0 +1,16 @@
+{
+  "baseUrl": "https://mini.example-tailnet.ts.net/",
+  "allowedHosts": ["localhost:8080", "127.0.0.1:8080", "mini", "mini.example-tailnet.ts.net"],
+  "sitesDirectory": "/absolute/path/to/legacy-sites",
+  "dataDirectory": "/absolute/path/to/private-tailnow-data",
+  "serviceLabel": "com.example.tailnow",
+  "apps": [
+    {
+      "slug": "pigeon",
+      "name": "Pigeon",
+      "description": "Files, notes, and reports",
+      "url": "https://mini.example-tailnet.ts.net:8443/",
+      "service": { "type": "launchAgent", "label": "com.example.pigeon" }
+    }
+  ]
+}

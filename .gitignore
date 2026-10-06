@@ -1,0 +1,10 @@
+node_modules/
+sites/
+.tailnow/
+apps.json
+*.state.json
+tailnow.json
+*.log
+.DS_Store
+deploy/*.plist
+test/artifacts/

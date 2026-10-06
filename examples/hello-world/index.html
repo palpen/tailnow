@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Hello World · Tailnow</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100svh; display: grid; place-items: center; padding: 24px; background: #0c1419; color: #eef6f5; font-family: system-ui, sans-serif; }
+    main { width: min(100%, 660px); padding: clamp(28px, 7vw, 64px); border: 1px solid #2b4147; border-radius: 28px; background: radial-gradient(ellipse at top right, #193a38, #122025 70%); }
+    .status { display: flex; align-items: center; gap: 10px; color: #a7e8d2; font-size: 14px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #8ce4bd; }
+    h1 { margin: 32px 0 16px; font-size: clamp(44px, 10vw, 76px); line-height: 1.05; letter-spacing: -.055em; }
+    p { color: #b8cbcf; line-height: 1.7; font-size: 18px; }
+    button { margin-top: 18px; padding: 14px 22px; border: 0; border-radius: 12px; color: #10261e; background: #a8edcd; font: inherit; font-weight: 650; cursor: pointer; }
+    button:hover { background: #c6f6df; }
+    button:focus-visible { outline: 3px solid white; outline-offset: 5px; }
+    #greeting { min-height: 30px; font-size: 15px; }
+    footer { margin-top: 36px; padding-top: 20px; border-top: 1px solid #2b4147; color: #91a9af; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="status"><span class="dot" aria-hidden="true"></span>Your little corner of the tailnet</div>
+    <h1>Hello, world.</h1>
+    <p>A small app, right at home on your network.<br>Served by Tailnow. Connected through Tailscale.</p>
+    <button id="hello" type="button">Say hello 👋</button>
+    <p id="greeting" role="status" aria-live="polite">Go ahead. Give it a wave.</p>
+    <footer>Hosted on your Mac mini · Available to your Tailscale devices</footer>
+  </main>
+  <script>
+    let waves = 0;
+    document.getElementById('hello').addEventListener('click', () => {
+      waves += 1;
+      document.getElementById('greeting').textContent = waves === 1
+        ? 'Hello back! Your app is working. 👋'
+        : `Hello again! You’ve sent ${waves} waves. 👋`;
+    });
+  </script>
+</body>
+</html>

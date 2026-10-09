@@ -104,3 +104,7 @@ npm audit --omit=dev
 ```
 
 Tests use disposable sites/configuration, mock service shutdown, and loopback listeners. They never stop installed apps or edit Tailscale routes. See [SECURITY.md](SECURITY.md) for the access boundary and limitations.
+
+## License
+
+Original code and documentation by Palermo Penano are covered by the [MIT License](LICENSE). Dependencies, uploaded websites, user data and other third-party material retain their own rights. See [LICENSING.md](LICENSING.md) for scope.

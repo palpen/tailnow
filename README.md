@@ -27,7 +27,7 @@ With a device named `mini`, open `http://mini/` or its full HTTPS Tailscale addr
 
 ## Publish
 
-Choose **Publish an app** in the directory, enter an app address, and upload a ZIP containing `index.html` at its root. The app appears immediately after a successful upload. Reusing an address publishes a new version. Republishing a removed or stopped site returns it to the directory; updating a minimized site keeps it minimized.
+Publish from the CLI using a ZIP containing `index.html` at its root. The app appears immediately after a successful upload. Reusing an address publishes a new version. Republishing a removed or stopped site returns it to the directory; updating a minimized site keeps it minimized.
 
 The existing agent API remains compatible:
 
@@ -38,6 +38,17 @@ curl -F "file=@site.zip" https://mini.example-tailnet.ts.net/api/publish/my-app
 The response retains `success`, `project`, `message`, and the actual HTTPS `url`. Static files remain available at `/<project>/` with nested paths, MIME types, HEAD and range requests. Project names accept 1–80 letters, numbers, underscores or hyphens; `api`, `_tailnow`, and `resume-data` are reserved. A configured external app cannot be overwritten by publishing a site with the same name.
 
 Uploads allow one multipart `file`, at most 100 MiB compressed, 256 MiB expanded, 64 MiB per file, 5,000 entries, and 30 seconds of extraction. Absolute paths, traversal, symlinks, encrypted archives, case-insensitive duplicate paths and private dotfiles are rejected. Finder's `__MACOSX` and `.DS_Store` entries are ignored. ZIP the build directory's contents, not its containing directory.
+
+Hosted app names and descriptions can be customized in the private config using `siteMetadata`. These labels survive CLI republishes and do not change app addresses or create entries for unpublished sites:
+
+```json
+"siteMetadata": {
+  "weather": {
+    "name": "Weather",
+    "description": "Toronto’s current temperature and today’s high and low."
+  }
+}
+```
 
 ## Directory controls
 

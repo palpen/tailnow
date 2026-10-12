@@ -70,7 +70,8 @@ test('one service lists legacy sites and external apps and preserves existing ro
   assert.match(home.body, /TailNow · Your apps/);
   assert.match(home.body, /Pigeon/);
   assert.match(home.body, /https:\/\/published.example\/weather\//);
-  assert.match(home.body, /id="publish-form"/);
+  assert.match(home.body, /<h1>TailNow<\/h1>/);
+  assert.doesNotMatch(home.body, /id="publish-form"|id="show-publish"|A little home|TailNow · Private apps/);
   assert.equal((await request('/weather/')).body, '<h1>Original weather</h1>');
   assert.equal((await request('/weather?next=//evil.example')).headers.location, 'https://published.example/weather/');
   assert.equal((await request('/pigeon')).headers.location, 'https://external.example:8443/');
@@ -321,4 +322,26 @@ test('startup failures and occupied ports return only a sanitized diagnostic', a
     assert.ifError(result.error); assert.equal(result.status, 1); assert.equal(result.stdout, '');
     assert.equal(result.stderr, 'TailNow could not start; check the local configuration, files, and port.\n');
   }
+});
+
+test('site metadata survives publishing without reserving or reviving sites', async t => {
+  const files = fixture(t);
+  files.config.siteMetadata = {
+    weather: { name: 'Toronto Weather', description: 'Current conditions & daily temperatures.' },
+    future: { name: 'Future app', description: 'Not published yet.' },
+  };
+  files.write();
+  const { request, upload, manage } = await running(t, {}, files);
+  let apps = JSON.parse((await request('/api/apps')).body).apps;
+  assert.equal(apps.find(app => app.slug === 'weather').name, 'Toronto Weather');
+  assert.equal(apps.some(app => app.slug === 'future'), false);
+  assert.equal((await upload('weather')).status, 200);
+  apps = JSON.parse((await request('/api/apps')).body).apps;
+  assert.equal(apps.find(app => app.slug === 'weather').description, 'Current conditions & daily temperatures.');
+  assert.match((await request('/')).body, /Current conditions &amp; daily temperatures\./);
+  assert.equal((await manage('weather', 'shutdown')).status, 200);
+  assert.equal(JSON.parse((await request('/api/apps')).body).apps.some(app => app.slug === 'weather'), false);
+  files.config.siteMetadata.weather.description = 'x'.repeat(301);
+  files.write();
+  assert.throws(() => loadConfig(files.configPath));
 });

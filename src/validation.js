@@ -57,10 +57,18 @@ function loadConfig(file) {
     }
     entries.set(item.slug, { slug: item.slug, kind: 'external', name: text(item.name, 120), description: item.description ? text(item.description, 300) : '', url: httpsUrl(item.url).href, shutdown });
   }
+  const siteMetadata = new Map();
+  if (raw.siteMetadata !== undefined) {
+    if (!raw.siteMetadata || typeof raw.siteMetadata !== 'object' || Array.isArray(raw.siteMetadata) || Object.keys(raw.siteMetadata).length > 500) throw new Error('Invalid site metadata');
+    for (const [slug, item] of Object.entries(raw.siteMetadata)) {
+      if (!validSlug(slug) || !item || typeof item !== 'object' || Array.isArray(item)) throw new Error('Invalid site metadata');
+      siteMetadata.set(slug, { name: text(item.name, 120), description: text(item.description, 300) });
+    }
+  }
   for (const key of ['sitesDirectory', 'dataDirectory']) if (typeof raw[key] !== 'string' || !path.isAbsolute(raw[key])) throw new Error('Absolute storage paths required');
   const sitesDirectory = path.resolve(raw.sitesDirectory), dataDirectory = path.resolve(raw.dataDirectory);
   if (dataDirectory === sitesDirectory || dataDirectory.startsWith(sitesDirectory + path.sep)) throw new Error('Private data must be outside sites');
-  return { entries, baseUrl: base.href, allowedHosts, sitesDirectory, dataDirectory };
+  return { entries, siteMetadata, baseUrl: base.href, allowedHosts, sitesDirectory, dataDirectory };
 }
 
 module.exports = { validSlug, escape, hostName, httpsUrl, text, readJson, loadConfig };

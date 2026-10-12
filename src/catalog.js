@@ -40,7 +40,7 @@ class Catalog {
         for (const slug of [...sites].sort()) {
           if (entries.has(slug)) continue;
           if (entries.size >= 500) throw new Error('Too many apps');
-          entries.set(slug, { slug, kind: 'site', name: slug.replaceAll('-', ' '), description: 'Published with TailNow', url: new URL(`${slug}/`, config.baseUrl).href, shutdown: { type: 'tailnow' } });
+          entries.set(slug, { slug, kind: 'site', name: slug.replaceAll('-', ' '), description: 'Published with TailNow', ...config.siteMetadata.get(slug), url: new URL(`${slug}/`, config.baseUrl).href, shutdown: { type: 'tailnow' } });
         }
         this.config = config;
         this.entries = entries;

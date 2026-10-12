@@ -9,7 +9,7 @@ function home(entries, state) {
     const isMinimized = status?.visibility === 'minimized';
     const controls = button(app.slug, isMinimized ? 'restore' : 'minimize', isMinimized ? 'Restore' : 'Minimize') +
       button(app.slug, 'confirm-remove', 'Remove…', `data-name="${escape(app.name)}" data-shutdown="${app.shutdown?.type || ''}"`);
-    const card = `<article class="app${isMinimized ? ' compact' : ''}"><a href="${escape(app.kind === 'site' ? app.url : `/${app.slug}`)}"><strong>${escape(app.name)}</strong><span>${escape(app.description)}</span><code>/${escape(app.slug)} →</code></a><div class="controls">${controls}</div></article>`;
+    const card = `<article class="app${isMinimized ? ' compact' : ''}"><a href="${escape(app.kind === 'site' ? app.url : `/${app.slug}`)}"><strong>${escape(app.name)}</strong><span>${escape(app.description)}</span></a><div class="controls">${controls}</div></article>`;
     (isMinimized ? minimized : featured).push(card);
   }
   for (const [slug, status] of Object.entries(state)) {

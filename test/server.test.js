@@ -345,3 +345,67 @@ test('site metadata survives publishing without reserving or reviving sites', as
   files.write();
   assert.throws(() => loadConfig(files.configPath));
 });
+
+test('reordering persists across restarts and leaves app routes and lifecycle state intact', async t => {
+  const files = fixture(t);
+  files.legacy('notes');
+  const live = await running(t, {}, files);
+  const order = async request => JSON.parse((await request('/api/apps')).body).apps.map(app => app.slug);
+  const move = target => live.request(target, { 'X-Tailnow-Request': '1' }, 'POST');
+  assert.deepEqual(await order(live.request), ['pigeon', 'notes', 'weather']);
+  assert.equal((await move('/api/apps/weather/before/pigeon')).status, 200);
+  assert.deepEqual(await order(live.request), ['weather', 'pigeon', 'notes']);
+  assert.ok((await live.request()).body.indexOf('data-slug="weather"') < (await live.request()).body.indexOf('data-slug="pigeon"'));
+  assert.equal((await move('/api/apps/weather/last')).status, 200);
+  assert.equal((await move('/api/apps/weather/last')).status, 200);
+  assert.deepEqual(await order(live.request), ['pigeon', 'notes', 'weather']);
+  assert.equal((await live.manage('notes', 'minimize')).status, 200);
+  assert.equal((await move('/api/apps/notes/before/pigeon')).status, 409);
+  assert.equal((await live.manage('pigeon', 'minimize')).status, 200);
+  assert.equal((await move('/api/apps/notes/before/pigeon')).status, 200);
+  const restarted = await running(t, {}, files);
+  assert.deepEqual(await order(restarted.request), ['notes', 'pigeon', 'weather']);
+  assert.equal((await restarted.request('/weather/')).body, '<h1>Original weather</h1>');
+  assert.equal((await restarted.request('/pigeon')).headers.location, 'https://external.example:8443/');
+  assert.equal(restarted.server.catalog.store.snapshot.apps.notes.visibility, 'minimized');
+  assert.equal((await restarted.manage('notes', 'restore')).status, 200);
+  files.legacy('added');
+  restarted.server.catalog.invalidate();
+  assert.deepEqual(await order(restarted.request), ['notes', 'pigeon', 'weather', 'added']);
+  assert.deepEqual(new StateStore(path.join(files.config.dataDirectory, 'catalog.json')).snapshot.order, ['notes', 'pigeon', 'weather']);
+});
+
+test('reordering rejects invalid or stale targets and respects the existing write boundary and lock', async t => {
+  const live = await running(t);
+  const target = '/api/apps/weather/before/pigeon';
+  const request = (path = target, headers = { 'X-Tailnow-Request': '1' }, body) => live.request(path, headers, 'POST', body);
+  assert.equal((await request(target, {})).status, 403);
+  assert.equal((await request(target, { 'X-Tailnow-Request': '1', Origin: 'https://evil.example' })).status, 403);
+  assert.equal((await request(target, { 'X-Tailnow-Request': '1' }, Buffer.from('x'))).status, 400);
+  assert.equal((await request('/api/apps/weather/before/missing')).status, 409);
+  assert.equal((await request('/api/apps/missing/last')).status, 404);
+  assert.equal((await request('/api/apps/weather/last?x=y')).status, 405);
+  const unlock = live.server.catalog.acquire();
+  assert.equal((await request()).status, 409);
+  unlock();
+  await live.manage('pigeon', 'remove');
+  assert.equal((await request()).status, 409);
+  assert.equal((await request('/api/apps/pigeon/last')).status, 409);
+  const prior = structuredClone(live.server.catalog.store.snapshot);
+  const update = live.server.catalog.store.update;
+  live.server.catalog.store.update = () => { throw new Error('disk failure'); };
+  assert.equal((await request('/api/apps/weather/last')).status, 503);
+  assert.deepEqual(live.server.catalog.store.snapshot, prior);
+  live.server.catalog.store.update = update;
+  assert.equal(live.server.catalog.busy, false);
+});
+
+test('order validation accepts old catalogs and rejects ambiguous or corrupt orders', t => {
+  const { validateState } = require('../src/state-store');
+  const old = { version: 1, apps: {}, deployments: {} };
+  assert.doesNotThrow(() => validateState(old));
+  for (const order of ['weather', ['weather', 'weather'], ['../secret'], [1], Array(2001).fill('weather')]) {
+    assert.throws(() => validateState({ ...old, order }));
+  }
+  assert.doesNotThrow(() => validateState({ ...old, order: ['__proto__', 'weather'] }));
+});

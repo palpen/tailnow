@@ -52,13 +52,15 @@ Hosted app names and descriptions can be customized in the private config using 
 
 ## Directory controls
 
+- **Reorder** by holding an app on a touchscreen, then dragging up or down; drag directly with a mouse. The list scrolls when you drag near the screen edges. Release to save, or press Escape to cancel. A swipe before the hold activates keeps scrolling normally.
+- **Keyboard / move buttons:** focus a grip and press ↑ or ↓, or choose Reorder to show labeled move buttons. Order is saved across devices and restarts, including within Minimized. Restoring an app retains its chosen position.
 - **Minimize / Restore** organize the directory across devices and restarts.
 - **Remove** hides the card and its bare `/<app>` shortcut. A hosted site's full `/<app>/` URL remains available.
 - **Also shut down** unpublishes a hosted site and retains its files. Republish it to bring it back. For a configured standalone app, it disables and unloads its dedicated LaunchAgent and verifies that the job is gone.
 
 Standalone app shutdown uses only the exact `service` mapping in the trusted configuration. No process IDs, shell commands, paths or labels are accepted from HTTP input. Configure dedicated app services only. Failed or interrupted shutdowns retain a visible retry record. Restarting a standalone service requires local administration; stop TailNow before removing its shutdown record from `catalog.json`.
 
-`GET /api/apps` provides a catalog of current hosted sites and configured external apps. `GET /api/health` identifies the merged service. Management uses bodyless `POST /api/apps/<slug>/{minimize,restore,remove,shutdown}` with `X-Tailnow-Request: 1`; the old `X-Mini-Request: 1` header remains accepted. Browser uploads also require the custom header. Normal curl uploads remain unchanged.
+`GET /api/apps` provides a catalog of current hosted sites and configured external apps. `GET /api/health` identifies the merged service. Management uses bodyless `POST /api/apps/<slug>/{minimize,restore,remove,shutdown}` with `X-Tailnow-Request: 1`; bodyless `POST /api/apps/<slug>/before/<target>` and `POST /api/apps/<slug>/last` reorder an app within its current visible or minimized list using the same header. Unknown or changed targets are rejected. The old `X-Mini-Request: 1` header remains accepted. Browser uploads also require the custom header. Normal curl uploads remain unchanged.
 
 ## Architecture and storage
 
@@ -73,7 +75,7 @@ TailNow is a modular monolith: one Node process, one listener, one catalog, and 
 | `src/services.js` | Fixed, validated macOS LaunchAgent operations |
 | `src/view.js` / `public/` | Directory rendering and browser controls |
 
-`sitesDirectory` contains existing sites imported from TailNow. New uploads go to `dataDirectory/releases/<slug>/<release-id>/`. The private `catalog.json` selects active releases and stores directory state. Both change in a single atomic file replacement only after extraction succeeds. Failed updates leave the live version intact. Existing site directories and previous releases are retained; no uploaded content can reach the private data directory through HTTP.
+`sitesDirectory` contains existing sites imported from TailNow. New uploads go to `dataDirectory/releases/<slug>/<release-id>/`. The private `catalog.json` selects active releases and stores directory state and the optional `order` array of app slugs. Older catalogs without an order retain discovery order; newly discovered apps follow the saved apps. Both change in a single atomic file replacement only after extraction succeeds. Failed updates leave the live version intact. Existing site directories and previous releases are retained; no uploaded content can reach the private data directory through HTTP.
 
 Shutdown marks a site inactive in the catalog instead of deleting its files. Legacy sites with no release record continue to be discovered directly. Do not run another static server over the storage directories: it would bypass TailNow's release selection and shutdown records.
 

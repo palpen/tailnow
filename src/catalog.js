@@ -48,7 +48,11 @@ class Catalog {
       } catch { this.error = true; }
     }
     if (this.error) throw new AppError(503, 'The app catalog is unavailable. Check the local configuration.');
-    return { ...this.config, entries: this.entries, state: this.store.snapshot.apps };
+    const order = this.store.snapshot.order || [];
+    const entries = new Map();
+    for (const slug of order) if (this.entries.has(slug)) entries.set(slug, this.entries.get(slug));
+    for (const [slug, app] of this.entries) if (!entries.has(slug)) entries.set(slug, app);
+    return { ...this.config, entries, state: this.store.snapshot.apps };
   }
   invalidate() { this.checkedAt = -Infinity; }
   acquire() {
@@ -80,6 +84,23 @@ class Catalog {
       if (state.apps[slug]?.visibility === 'removed') delete state.apps[slug];
     });
     this.invalidate();
+  }
+  reorder(slug, before = null) {
+    const release = this.acquire();
+    try {
+      const { entries, state } = this.snapshot(true);
+      const visibility = name => state[name]?.visibility || 'visible';
+      if (!entries.has(slug)) throw new AppError(404, 'App is no longer available. Reload the directory.');
+      if (visibility(slug) === 'removed') throw new AppError(409, 'Restore this app before reordering it.');
+      if (before === slug) return;
+      if (before !== null && (!entries.has(before) || visibility(before) !== visibility(slug))) throw new AppError(409, 'The directory changed. Reload before reordering.');
+      const order = [...entries.keys()].filter(name => name !== slug);
+      const last = order.findLastIndex(name => visibility(name) === visibility(slug));
+      order.splice(before === null ? last + 1 : order.indexOf(before), 0, slug);
+      // Retain positions for temporarily undiscovered apps and their future restores.
+      for (const name of this.store.snapshot.order || []) if (!entries.has(name)) order.push(name);
+      this.store.update(next => { next.order = order.slice(0, 2000); });
+    } finally { release(); }
   }
   async manage(slug, operation, stopApp) {
     const release = this.acquire();

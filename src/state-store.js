@@ -6,6 +6,7 @@ const { readJson, validSlug, text } = require('./validation');
 const releasePattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 function validateState(state) {
   if (!state || state.version !== 1) throw new Error('Invalid catalog version');
+  if (state.order !== undefined && (!Array.isArray(state.order) || state.order.length > 2000 || state.order.some(slug => typeof slug !== 'string' || !validSlug(slug)) || new Set(state.order).size !== state.order.length)) throw new Error('Invalid app order');
   for (const key of ['apps', 'deployments']) {
     const value = state[key];
     if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > 2000) throw new Error('Invalid catalog');

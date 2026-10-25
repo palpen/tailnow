@@ -69,13 +69,14 @@ function createServer({ configPath, reloadMs = 1000, shutdown = stopApp, limits 
     const pathname = req.url.split('?')[0];
     const publishMatch = /^\/api\/publish\/([^/]+)$/.exec(pathname);
     const action = /^\/api\/apps\/([a-zA-Z0-9_-]{1,80})\/(minimize|restore|remove|shutdown)$/.exec(pathname);
+    const reorder = /^\/api\/apps\/([a-zA-Z0-9_-]{1,80})\/(?:before\/([a-zA-Z0-9_-]{1,80})|last)$/.exec(pathname);
     if (pathname.startsWith('/api/') || pathname === '/' || assets.has(pathname)) dashboardHeaders(res);
     if (req.method === 'POST') {
-      if (req.url !== pathname || (!publishMatch && !action)) return res.status(405).send('Method not allowed');
+      if (req.url !== pathname || (!publishMatch && !action && !reorder)) return res.status(405).send('Method not allowed');
       const header = req.headers['x-tailnow-request'] === '1' || req.headers['x-mini-request'] === '1';
       // CLI publishing stays compatible. Browsers must use a custom header;
       // cross-origin preflights never receive CORS permission.
-      if (!header && (action || req.headers.origin || req.headers['sec-fetch-site'])) return res.status(403).send('Management request blocked');
+      if (!header && (action || reorder || req.headers.origin || req.headers['sec-fetch-site'])) return res.status(403).send('Management request blocked');
       if (publishMatch) {
         let release;
         try {
@@ -93,6 +94,10 @@ function createServer({ configPath, reloadMs = 1000, shutdown = stopApp, limits 
         }
       }
       if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return res.status(400).set('Connection', 'close').send('Management requests have no body');
+      if (reorder) {
+        try { catalog.reorder(reorder[1], reorder[2] || null); return res.type('text').send('Saved'); }
+        catch (error) { return next(error); }
+      }
       try { await catalog.manage(action[1], action[2], shutdown); return res.type('text').send('Saved'); }
       catch (error) { return next(error); }
     }

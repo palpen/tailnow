@@ -6,6 +6,7 @@
   "main": "server.js",
   "engines": { "node": ">=24.21.0 <25" },
   "scripts": {
+    "demo": "node scripts/demo.js",
     "start": "node server.js",
     "test": "node --test test/*.test.js"
   },

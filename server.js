@@ -3,6 +3,8 @@ const { once } = require('node:events');
 const { createServer } = require('./src/http');
 
 async function start() {
+  const [major, minor, patch] = process.versions.node.split('.').map(Number);
+  if (major !== 24 || minor < 22 || (minor === 22 && patch < 3)) throw new Error('Use patched Node 24.22.3 or newer in the 24.x series');
   const port = Number(process.env.PORT || 8080);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid port');
   if (process.env.HOST && process.env.HOST !== '127.0.0.1') throw new Error('Only loopback binding is supported');

@@ -3,6 +3,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { Worker } = require('node:worker_threads');
 const { AppError } = require('./catalog');
+const { pruneReleases } = require('./storage');
 
 const defaultLimits = { uploadBytes: 100 * 1024 * 1024, expandedBytes: 256 * 1024 * 1024, fileBytes: 64 * 1024 * 1024, entries: 5000, timeoutMs: 30000 };
 
@@ -39,7 +40,10 @@ async function publish(catalog, slug, archive, limits = defaultLimits) {
     fs.rmSync(directory, { recursive: true, force: true });
     throw error;
   }
-  return { success: true, project: slug, message: `Successfully published to /${slug}`, url: new URL(`${slug}/`, catalog.config.baseUrl).href };
+  // Never roll back or delete the activated release if retention maintenance fails.
+  let maintenanceNeeded = false;
+  try { pruneReleases(catalog, slug); } catch { maintenanceNeeded = true; }
+  return { success: true, project: slug, message: `Successfully published to /${slug}`, url: new URL(`${slug}/`, catalog.config.siteOrigins.get(slug)).href, ...(maintenanceNeeded ? { warning: 'Published; release cleanup needs administrator attention.' } : {}) };
 }
 
 module.exports = { publish, defaultLimits };

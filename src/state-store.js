@@ -1,11 +1,21 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
-const { readJson, validSlug, text } = require('./validation');
+const { readJson, validSlug, text, httpsUrl } = require('./validation');
 
 const releasePattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 function validateState(state) {
   if (!state || state.version !== 1) throw new Error('Invalid catalog version');
+  if (state.origins !== undefined) {
+    if (!state.origins || typeof state.origins !== 'object' || Array.isArray(state.origins) || Object.keys(state.origins).length > 2000) throw new Error('Invalid origin history');
+    for (const [origin, slug] of Object.entries(state.origins)) if (httpsUrl(origin).origin !== origin || !validSlug(slug)) throw new Error('Invalid origin history');
+  }
+  if (state.adminOrigins !== undefined && (!Array.isArray(state.adminOrigins) || state.adminOrigins.length > 100 || state.adminOrigins.some(origin => {
+    if (typeof origin !== 'string') return true;
+    const url = new URL(origin);
+    return url.origin !== origin || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(url.hostname)));
+  }))) throw new Error('Invalid administration origins');
+  if (state.legacyOrigins !== undefined && (!Array.isArray(state.legacyOrigins) || state.legacyOrigins.length > 100 || state.legacyOrigins.some(origin => httpsUrl(origin).origin !== origin))) throw new Error('Invalid legacy origin history');
   if (state.order !== undefined && (!Array.isArray(state.order) || state.order.length > 2000 || state.order.some(slug => typeof slug !== 'string' || !validSlug(slug)) || new Set(state.order).size !== state.order.length)) throw new Error('Invalid app order');
   for (const key of ['apps', 'deployments']) {
     const value = state[key];

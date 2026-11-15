@@ -5,6 +5,45 @@ const cancel = document.querySelector('#cancel-remove');
 const notice = document.querySelector('#notice');
 let selection;
 let saving = false;
+let adminToken = '';
+let isAdmin = false;
+const loginDialog = document.querySelector('#login-dialog');
+const authHeaders = () => ({ 'X-Tailnow-Request': '1', Authorization: `Bearer ${adminToken}` });
+function setAdmin(token) {
+  adminToken = token; isAdmin = Boolean(token);
+  document.body.classList.toggle('is-admin', isAdmin);
+  document.querySelector('#sign-in').hidden = isAdmin;
+  document.querySelector('#sign-out').hidden = !isAdmin;
+  document.querySelector('#access-status').textContent = isAdmin ? 'Administrator' : 'View only';
+  try { if (token) sessionStorage.setItem('tailnow-admin-session', token); else sessionStorage.removeItem('tailnow-admin-session'); } catch {}
+}
+document.querySelector('#sign-in').addEventListener('click', () => { loginDialog.showModal(); document.querySelector('#admin-key').focus(); });
+document.querySelector('#cancel-login').addEventListener('click', () => loginDialog.close());
+document.querySelector('#login-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const input = document.querySelector('#admin-key'), key = input.value.trim(); input.value = '';
+  const button = document.querySelector('#submit-login'); button.disabled = true;
+  try {
+    const response = await fetch('/api/admin/login', { method: 'POST', headers: { 'X-Tailnow-Request': '1', Authorization: `Bearer ${key}` }, credentials: 'omit', cache: 'no-store' });
+    if (!response.ok) throw new Error(await response.text());
+    setAdmin((await response.json()).token); loginDialog.close();
+    document.querySelector('#login-error').textContent = ''; notice.textContent = 'Administrator access enabled for one hour.';
+  } catch (error) { document.querySelector('#login-error').textContent = error.message || 'Could not sign in.'; }
+  finally { button.disabled = false; }
+});
+document.querySelector('#sign-out').addEventListener('click', async () => {
+  try { await fetch('/api/admin/logout', { method: 'POST', headers: authHeaders(), credentials: 'omit' }); }
+  catch { /* Clear this browser's credential even when the server is offline. */ }
+  finally { setAdmin(''); notice.textContent = 'Signed out.'; }
+});
+void (async () => {
+  try {
+    const token = sessionStorage.getItem('tailnow-admin-session');
+    if (!token) return;
+    const response = await fetch('/api/admin/session', { headers: { Authorization: `Bearer ${token}` }, credentials: 'omit', cache: 'no-store' });
+    setAdmin(response.ok ? token : '');
+  } catch { setAdmin(''); }
+})();
 
 try {
   notice.textContent = sessionStorage.getItem('mini-notice') || '';
@@ -15,7 +54,7 @@ try {
 } catch { /* The controls also work with browser storage disabled. */ }
 
 async function change(slug, action) {
-  if (saving) return;
+  if (saving || !isAdmin) return;
   saving = true;
   for (const button of document.querySelectorAll('button')) button.disabled = true;
   checkbox.disabled = true;
@@ -24,8 +63,9 @@ async function change(slug, action) {
   let message;
   try {
     const response = await fetch(`/api/apps/${encodeURIComponent(slug)}/${action}`, {
-      method: 'POST', headers: { 'X-Tailnow-Request': '1' }, credentials: 'same-origin',
+      method: 'POST', headers: authHeaders(), credentials: 'omit',
     });
+    if (response.status === 401) setAdmin('');
     message = response.ok ? {
       minimize: 'App minimized. It is still available at its usual address.',
       restore: 'App restored to your directory.',
@@ -54,7 +94,7 @@ async function change(slug, action) {
 
 document.addEventListener('click', event => {
   const button = event.target.closest('button[data-action]');
-  if (!button || saving) return;
+  if (!button || saving || !isAdmin) return;
   const { slug, action, name, shutdown } = button.dataset;
   if (action === 'minimize' || action === 'restore') {
     void change(slug, action);
@@ -107,6 +147,7 @@ function updateMoveButtons() {
 }
 function restoreRows(list, rows) { for (const row of rows) list.append(row); }
 function showReorder() {
+  if (!isAdmin) return;
   const open = !document.body.classList.contains('reordering');
   document.body.classList.toggle('reordering', open);
   reorderToggle.setAttribute('aria-pressed', String(open));
@@ -115,6 +156,7 @@ function showReorder() {
 reorderToggle.addEventListener('click', showReorder);
 
 async function savePosition(row, original, focused = document.activeElement) {
+  if (!isAdmin) return;
   const list = row.parentElement;
   const rows = cards(list);
   if (rows.every((item, index) => item === original[index])) return;
@@ -125,8 +167,9 @@ async function savePosition(row, original, focused = document.activeElement) {
   const target = before ? `before/${encodeURIComponent(before)}` : 'last';
   try {
     const response = await fetch(`/api/apps/${encodeURIComponent(row.dataset.slug)}/${target}`, {
-      method: 'POST', headers: { 'X-Tailnow-Request': '1' }, credentials: 'same-origin',
+      method: 'POST', headers: authHeaders(), credentials: 'omit',
     });
+    if (response.status === 401) setAdmin('');
     if (!response.ok) throw new Error(await response.text());
     announce(`${row.dataset.name} moved to position ${rows.indexOf(row) + 1} of ${rows.length}. Order saved across devices.`);
     notice.textContent = '';
@@ -142,7 +185,7 @@ async function savePosition(row, original, focused = document.activeElement) {
   }
 }
 function moveOne(row, direction) {
-  if (saving || gesture) return;
+  if (saving || gesture || !isAdmin) return;
   const focused = document.activeElement;
   const original = cards(row.parentElement);
   const sibling = direction === 'up' ? row.previousElementSibling : row.nextElementSibling;
@@ -174,7 +217,7 @@ document.addEventListener('contextmenu', event => { if (gesture && event.target.
 
 function candidate(target, x, y, kind, id) {
   const row = target.closest('.app');
-  if (saving || gesture || !row || target.closest('.controls,.order-controls') || (target.closest('button') && !target.closest('.reorder-handle'))) return;
+  if (saving || gesture || !isAdmin || !row || target.closest('.controls,.order-controls') || (target.closest('button') && !target.closest('.reorder-handle'))) return;
   gesture = { row, list: row.parentElement, original: cards(row.parentElement), x, y, startX: x, startY: y, kind, id, active: false };
   if (kind === 'touch') gesture.timer = setTimeout(beginDrag, 420);
 }

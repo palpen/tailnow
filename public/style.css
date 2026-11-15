@@ -1,4 +1,9 @@
 *{box-sizing:border-box}
+[hidden]{display:none!important}
+body:not(.is-admin) .controls,body:not(.is-admin) .order-controls,body:not(.is-admin) .reorder-handle,body:not(.is-admin) #toggle-reorder,body:not(.is-admin) #reorder-help{display:none}
+.auth-bar{display:flex;align-items:center;gap:12px;justify-content:flex-end;margin-bottom:20px;font-size:14px}
+#login-form label{display:block;font-weight:600;margin:16px 0 8px}
+#admin-key{display:block;width:100%;padding:12px;border:1px solid #cbd8c8;border-radius:8px;font:inherit}
 body{margin:0;background:#f5f3ed;color:#203629;font:17px/1.5 system-ui,sans-serif}
 main{max-width:960px;margin:7vh auto;padding:28px}
 h1{font-size:32px;line-height:1.2;letter-spacing:-.04em;margin:0 0 24px}

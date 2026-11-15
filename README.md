@@ -2,6 +2,23 @@
 
 One private service for publishing static apps to your Tailscale network and finding them in your app directory. The Mini Shortcuts dashboard is now part of TailNow, including external shortcuts, minimize/restore, removal, and optional standalone service shutdown.
 
+[![TailNow’s app directory with Snack Lab, Side Quest, Moon Watch, The Plot Thickens, Plant Parenthood, Pocket Arcade, and two minimized apps.](docs/images/tailnow-demo.png)](docs/images/tailnow-demo.png)
+
+*The real TailNow interface, filled with fictional apps for everyday adventures.*
+
+## Try the demo
+
+With Node 24.21 or newer on the 24.x line:
+
+```sh
+npm ci
+npm run demo
+```
+
+Open [localhost:8081](http://localhost:8081). Minimize, restore, and remove work just as they do in the app. The example app links lead to example.com; they illustrate a personal directory rather than functioning apps. The demo uses temporary data, leaves your private configuration untouched, and resets on every launch. Stop it with Ctrl+C. Set `PORT` to use a different port.
+
+The screenshot above was captured at 1280 × 1050 with a 2× pixel scale, using the production renderer, stylesheet, and browser controls without visual overrides.
+
 ## Run
 
 Use Node 24.21 or newer on the 24.x line.

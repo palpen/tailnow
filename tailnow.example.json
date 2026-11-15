@@ -1,9 +1,12 @@
 {
-  "baseUrl": "https://mini.example-tailnet.ts.net/",
-  "allowedHosts": ["localhost:8080", "127.0.0.1:8080", "mini", "mini.example-tailnet.ts.net"],
+  "baseUrl": "https://mini.example-tailnet.ts.net:8446/",
+  "allowedHosts": ["localhost:8080", "127.0.0.1:8080", "mini.example-tailnet.ts.net:8446"],
   "sitesDirectory": "/absolute/path/to/legacy-sites",
   "dataDirectory": "/absolute/path/to/private-tailnow-data",
   "serviceLabel": "com.example.tailnow",
+  "siteOrigins": { "my-app": "https://mini.example-tailnet.ts.net:8500" },
+  "siteOptions": {},
+  "storage": { "maxBytes": 5368709120, "minFreeBytes": 536870912, "keepReleases": 3 },
   "apps": [
     {
       "slug": "pigeon",

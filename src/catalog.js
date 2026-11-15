@@ -24,6 +24,19 @@ class Catalog {
       try {
         const config = loadConfig(this.configPath);
         if (config.sitesDirectory !== this.locations[0] || config.dataDirectory !== this.locations[1]) throw new Error('Restart to change storage');
+        const origins = this.store.snapshot.origins || {}, adminOrigins = this.store.snapshot.adminOrigins || [], legacyOrigins = this.store.snapshot.legacyOrigins || [];
+        const adminOrigin = new URL(config.baseUrl).origin;
+        if (Object.hasOwn(origins, adminOrigin) || legacyOrigins.includes(adminOrigin)) throw new Error('A former app or shared origin cannot become an administrator origin');
+        for (const [slug, origin] of config.siteOrigins) {
+          if ((Object.hasOwn(origins, origin) && origins[origin] !== slug) || adminOrigins.includes(origin) || legacyOrigins.includes(origin)) throw new Error('An origin cannot be reassigned to a different application');
+        }
+        if (config.legacyOrigins.some(origin => Object.hasOwn(origins, origin) || adminOrigins.includes(origin))) throw new Error('Only former shared origins can migrate browser storage');
+        if (!adminOrigins.includes(adminOrigin) || config.legacyOrigins.some(origin => !legacyOrigins.includes(origin)) || [...config.siteOrigins.values()].some(origin => !Object.hasOwn(origins, origin))) this.store.update(state => {
+          state.origins ||= {}; state.adminOrigins ||= []; state.legacyOrigins ||= [];
+          if (!state.adminOrigins.includes(adminOrigin)) state.adminOrigins.push(adminOrigin);
+          for (const origin of config.legacyOrigins) if (!state.legacyOrigins.includes(origin)) state.legacyOrigins.push(origin);
+          for (const [slug, origin] of config.siteOrigins) setEntry(state.origins, origin, slug);
+        });
         const sites = new Set();
         const directory = fs.opendirSync(config.sitesDirectory);
         try {
@@ -40,7 +53,8 @@ class Catalog {
         for (const slug of [...sites].sort()) {
           if (entries.has(slug)) continue;
           if (entries.size >= 500) throw new Error('Too many apps');
-          entries.set(slug, { slug, kind: 'site', name: slug.replaceAll('-', ' '), description: 'Published with TailNow', ...config.siteMetadata.get(slug), url: new URL(`${slug}/`, config.baseUrl).href, shutdown: { type: 'tailnow' } });
+          if (!config.siteOrigins.has(slug)) throw new Error('Assign an isolated HTTPS origin to each hosted app');
+          entries.set(slug, { slug, kind: 'site', name: slug.replaceAll('-', ' '), description: 'Published with TailNow', ...config.siteMetadata.get(slug), url: new URL(`${slug}/`, config.siteOrigins.get(slug)).href, shutdown: { type: 'tailnow' } });
         }
         this.config = config;
         this.entries = entries;
@@ -74,6 +88,7 @@ class Catalog {
     if (!validSlug(slug)) throw new AppError(400, 'Use 1–80 letters, numbers, underscores or hyphens, and a non-reserved app name.');
     const config = this.snapshot(true);
     if (config.entries.get(slug)?.kind === 'external') throw new AppError(409, 'This name belongs to a configured external app. Choose another name.');
+    if (!config.siteOrigins.has(slug)) throw new AppError(409, 'Configure a separate HTTPS origin for this app before publishing.');
     if (!config.entries.has(slug) && config.entries.size >= 500) throw new AppError(409, 'The app directory is full.');
   }
   activate(slug, release) {

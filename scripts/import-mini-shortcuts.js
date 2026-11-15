@@ -4,14 +4,16 @@ const { loadConfig, readJson } = require('../src/validation');
 const { validateState } = require('../src/state-store');
 
 // Run with both services stopped. Refuse to overwrite an existing catalog.
-function importMini({ miniConfigPath, miniStatePath, configPath, sitesDirectory, dataDirectory, allowedHosts = [], serviceLabel = 'com.example.tailnow' }) {
+function importMini({ miniConfigPath, miniStatePath, configPath, sitesDirectory, dataDirectory, allowedHosts = [], serviceLabel = 'com.example.tailnow', siteOrigins = {}, baseUrl }) {
   const legacy = readJson(miniConfigPath);
+  if (!baseUrl || new URL(baseUrl).origin === new URL(legacy.tailnow.url).origin) throw new Error('Choose a fresh administrator baseUrl when importing a shared-origin installation');
   const state = miniStatePath && fs.existsSync(miniStatePath) ? readJson(miniStatePath) : { version: 1, apps: {} };
   const catalog = validateState({ ...state, deployments: {} });
   const settings = {
-    baseUrl: legacy.tailnow.url,
-    allowedHosts: [...new Set([...legacy.allowedHosts.filter(host => !/^(localhost|127\.0\.0\.1):/.test(host)), ...allowedHosts])],
-    sitesDirectory: path.resolve(sitesDirectory), dataDirectory: path.resolve(dataDirectory), serviceLabel, apps: legacy.apps,
+    baseUrl,
+    legacyOrigins: [new URL(legacy.tailnow.url).origin],
+    allowedHosts: [...new Set([...legacy.allowedHosts.filter(host => !/^(localhost|127\.0\.0\.1):/.test(host)), ...allowedHosts, new URL(baseUrl).host])],
+    sitesDirectory: path.resolve(sitesDirectory), dataDirectory: path.resolve(dataDirectory), serviceLabel, apps: legacy.apps, siteOrigins,
   };
   if (fs.existsSync(configPath) || fs.existsSync(path.join(dataDirectory, 'catalog.json'))) throw new Error('Destination already initialized');
   fs.mkdirSync(dataDirectory, { recursive: true, mode: 0o700 });

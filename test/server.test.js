@@ -21,6 +21,7 @@ function fixture(t) {
     allowedHosts: ['mini', 'published.example'], baseUrl: 'https://published.example/',
     sitesDirectory: path.join(dir, 'sites'), dataDirectory: path.join(dir, 'data'),
     serviceLabel: 'com.example.tailnow',
+    siteOrigins: Object.fromEntries(['weather', 'new-app', 'attack', '__proto__', 'notes', 'added'].map(slug => [slug, `https://${slug.replaceAll('_', 'x')}.apps.example`])),
     apps: [{ slug: 'pigeon', name: 'Pigeon', description: 'Files', url: 'https://external.example:8443/', service: { type: 'launchAgent', label: 'com.example.pigeon' } }],
   };
   fs.mkdirSync(config.sitesDirectory);
@@ -38,10 +39,11 @@ async function running(t, options = {}, files = fixture(t)) {
   const server = createServer({ configPath: files.configPath, ...options });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
+  const key = fs.readFileSync(path.join(files.config.dataDirectory, 'admin-token'), 'utf8').trim();
   t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
   const request = (target = '/', headers = {}, method = 'GET', body) => new Promise((resolve, reject) => {
     const req = http.request({ hostname: '127.0.0.1', port: server.address().port, path: target, method,
-      headers: { Host: 'mini', ...(body ? { 'Content-Length': body.length } : {}), ...headers }, agent: false }, res => {
+      headers: { Host: target.startsWith(`/${target.split('/')[1]}/`) && files.config.siteOrigins[target.split('/')[1]] ? new URL(files.config.siteOrigins[target.split('/')[1]]).host : 'published.example', ...(method === 'POST' ? { Authorization: `Bearer ${key}` } : {}), ...(body ? { 'Content-Length': body.length } : {}), ...headers }, agent: false }, res => {
       const chunks = [];
       res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString() }));
@@ -55,7 +57,7 @@ async function running(t, options = {}, files = fixture(t)) {
     return request(`/api/publish/${slug}`, { 'Content-Type': `multipart/form-data; boundary=${boundary}`, ...headers }, 'POST', body);
   };
   const manage = (slug, action, headers = {}) => request(`/api/apps/${slug}/${action}`, { 'X-Tailnow-Request': '1', ...headers }, 'POST');
-  return { ...files, server, request, upload, manage };
+  return { ...files, server, request, upload, manage, key };
 }
 function zip(files = { 'index.html': '<h1>Fresh release</h1>', 'assets/app.js': 'console.log("ready")' }) {
   const archive = new AdmZip();
@@ -69,11 +71,11 @@ test('one service lists legacy sites and external apps and preserves existing ro
   assert.equal(home.status, 200);
   assert.match(home.body, /TailNow · Your apps/);
   assert.match(home.body, /Pigeon/);
-  assert.match(home.body, /https:\/\/published.example\/weather\//);
+  assert.match(home.body, /https:\/\/weather.apps.example\/weather\//);
   assert.match(home.body, /<h1>TailNow<\/h1>/);
   assert.doesNotMatch(home.body, /id="publish-form"|id="show-publish"|A little home|TailNow · Private apps/);
   assert.equal((await request('/weather/')).body, '<h1>Original weather</h1>');
-  assert.equal((await request('/weather?next=//evil.example')).headers.location, 'https://published.example/weather/');
+  assert.equal((await request('/weather?next=//evil.example')).headers.location, 'https://weather.apps.example/weather?next=//evil.example');
   assert.equal((await request('/pigeon')).headers.location, 'https://external.example:8443/');
   assert.equal((await request('/pigeon/')).status, 302);
   assert.equal(JSON.parse((await request('/api/health')).body).service, 'tailnow');
@@ -83,7 +85,7 @@ test('publishing makes a validated release and catalog entry visible together', 
   const { upload, request, config, server } = await running(t, { reloadMs: 60000 });
   const result = await upload('new-app', zip(), { 'X-Forwarded-Host': 'evil.example' });
   assert.equal(result.status, 200, result.body);
-  assert.equal(JSON.parse(result.body).url, 'https://published.example/new-app/');
+  assert.equal(JSON.parse(result.body).url, 'https://new-app.apps.example/new-app/');
   assert.match((await request()).body, /new-app/);
   assert.equal((await request('/new-app/')).body, '<h1>Fresh release</h1>');
   assert.equal((await request('/new-app/assets/app.js')).status, 200);
@@ -189,6 +191,7 @@ test('external shutdown persists removal first, sanitizes failures and supports 
 test('a catalog write failure never stops a service or replaces an active release', async t => {
   let stops = 0;
   const { manage, upload, request, config } = await running(t, { shutdown: async () => stops++ });
+  fs.unlinkSync(path.join(config.dataDirectory, 'catalog.json'));
   fs.mkdirSync(path.join(config.dataDirectory, 'catalog.json'));
   assert.equal((await manage('pigeon', 'shutdown')).status, 503);
   assert.equal(stops, 0);
@@ -218,8 +221,8 @@ test('host, origin and browser write checks protect the whole HTTP surface', asy
   for (const host of ['evil.example', 'mini.evil.example', 'mini:9999', '']) assert.equal((await request('/', { Host: host })).status, 403);
   for (const origin of ['null', 'https://evil.example']) assert.equal((await manage('weather', 'remove', { Origin: origin })).status, 403);
   assert.equal((await upload('weather', zip(), { Origin: 'http://mini' })).status, 403);
-  assert.equal((await upload('weather', zip(), { Origin: 'http://mini', 'X-Tailnow-Request': '1' })).status, 200);
-  assert.equal((await request('/api/apps/weather/remove', {}, 'POST')).status, 403);
+  assert.equal((await upload('weather', zip(), { Origin: 'https://published.example', 'X-Tailnow-Request': '1' })).status, 200);
+  assert.equal((await request('/api/apps/weather/remove', { Authorization: '' }, 'POST')).status, 401);
   assert.equal((await manage('weather', 'remove', { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate' })).status, 403);
   assert.equal((await request('/api/publish/x', {}, 'OPTIONS')).status, 405);
   assert.equal((await request('/weather', { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate' })).status, 302);
@@ -253,7 +256,7 @@ test('dashboard escapes app text and isolates its CSP from hosted app scripts', 
   assert.match(home.body, /&lt;script&gt;/);
   assert.doesNotMatch(home.body, /<script>alert/);
   assert.match(home.headers['content-security-policy'], /script-src 'self'/);
-  assert.equal((await request('/weather/')).headers['content-security-policy'], undefined);
+  assert.equal((await request('/weather/')).headers['content-security-policy'], "frame-ancestors 'none'; object-src 'none'");
   assert.equal((await request('/app.js')).status, 200);
 });
 
@@ -379,7 +382,7 @@ test('reordering rejects invalid or stale targets and respects the existing writ
   const live = await running(t);
   const target = '/api/apps/weather/before/pigeon';
   const request = (path = target, headers = { 'X-Tailnow-Request': '1' }, body) => live.request(path, headers, 'POST', body);
-  assert.equal((await request(target, {})).status, 403);
+  assert.equal((await request(target, { Authorization: '' })).status, 401);
   assert.equal((await request(target, { 'X-Tailnow-Request': '1', Origin: 'https://evil.example' })).status, 403);
   assert.equal((await request(target, { 'X-Tailnow-Request': '1' }, Buffer.from('x'))).status, 400);
   assert.equal((await request('/api/apps/weather/before/missing')).status, 409);

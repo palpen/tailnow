@@ -21,11 +21,12 @@ const apps = [
 fs.mkdirSync(path.join(directory, 'data'));
 const configPath = path.join(directory, 'config.json');
 fs.writeFileSync(configPath, JSON.stringify({
-  baseUrl: 'https://demo.example/',
+  baseUrl: `http://127.0.0.1:${port}/`,
   allowedHosts: ['demo.example', `127.0.0.1:${port}`, `localhost:${port}`],
   sitesDirectory: path.join(directory, 'sites'),
   dataDirectory: path.join(directory, 'data'),
   serviceLabel: 'com.example.tailnow-demo',
+  siteOrigins: {},
   apps,
 }));
 fs.writeFileSync(path.join(directory, 'data/catalog.json'), JSON.stringify({
@@ -39,6 +40,7 @@ const server = createServer({ configPath });
 server.listen(port, '127.0.0.1', () => {
   console.log(`TailNow demo: http://127.0.0.1:${port}`);
   console.log('Fictional apps; links lead to example.com. Directory controls are real.');
+  console.log(`Private administrator key: ${path.join(directory, 'data/admin-token')} (read this file to sign in).`);
   console.log('Stop with Ctrl+C. Each run starts with a fresh demo layout.');
 });
 process.once('exit', () => fs.rmSync(directory, { recursive: true, force: true }));

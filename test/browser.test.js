@@ -90,7 +90,7 @@ test('browser: legacy storage migration copies only owned keys once and preserve
       localStorage.setItem('alpha-private', 'SAVED ALPHA DATA'); localStorage.setItem('beta-private', 'DO NOT SHARE'); localStorage.setItem('seeded', '1');
     }
   }, { legacy: a.legacy });
-  await page.goto(a.legacy + '/alpha/'); await page.waitForURL(a.alpha + '/alpha/');
+  await page.goto(a.admin); await page.locator('[data-slug="alpha"] a').click(); await page.waitForURL(a.alpha + '/alpha/');
   assert.equal(await page.evaluate(() => localStorage.getItem('alpha-private')), 'SAVED ALPHA DATA');
   assert.equal(await page.evaluate(() => localStorage.getItem('beta-private')), null);
   await page.evaluate(() => localStorage.setItem('alpha-private', 'NEWER DATA'));

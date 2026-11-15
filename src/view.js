@@ -11,7 +11,7 @@ function home(entries, state) {
       button(app.slug, 'confirm-remove', 'Remove…', `data-name="${escape(app.name)}" data-shutdown="${app.shutdown?.type || ''}"`);
     const reorder = `<button type="button" class="reorder-handle" aria-label="Reorder ${escape(app.name)}" aria-describedby="reorder-help" title="Drag to reorder; use arrow keys when focused"><span aria-hidden="true">⠿</span></button>`;
     const moves = `<div class="order-controls"><button type="button" data-move="up" aria-label="Move ${escape(app.name)} up">↑</button><button type="button" data-move="down" aria-label="Move ${escape(app.name)} down">↓</button></div>`;
-    const card = `<article class="app${isMinimized ? ' compact' : ''}" data-slug="${escape(app.slug)}" data-name="${escape(app.name)}">${reorder}<a draggable="false" href="${escape(app.kind === 'site' ? app.url : `/${app.slug}`)}"><strong>${escape(app.name)}</strong><span>${escape(app.description)}</span></a><div class="controls">${controls}</div>${moves}</article>`;
+    const card = `<article class="app${isMinimized ? ' compact' : ''}" data-slug="${escape(app.slug)}" data-name="${escape(app.name)}">${reorder}<a draggable="false" href="${escape(app.kind === 'site' ? app.launchUrl || app.url : `/${app.slug}`)}"><strong>${escape(app.name)}</strong><span>${escape(app.description)}</span></a><div class="controls">${controls}</div>${moves}</article>`;
     (isMinimized ? minimized : featured).push(card);
   }
   for (const [slug, status] of Object.entries(state)) {

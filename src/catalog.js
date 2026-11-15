@@ -54,7 +54,11 @@ class Catalog {
           if (entries.has(slug)) continue;
           if (entries.size >= 500) throw new Error('Too many apps');
           if (!config.siteOrigins.has(slug)) throw new Error('Assign an isolated HTTPS origin to each hosted app');
-          entries.set(slug, { slug, kind: 'site', name: slug.replaceAll('-', ' '), description: 'Published with TailNow', ...config.siteMetadata.get(slug), url: new URL(`${slug}/`, config.siteOrigins.get(slug)).href, shutdown: { type: 'tailnow' } });
+          const url = new URL(`${slug}/`, config.siteOrigins.get(slug)).href;
+          // Directory visits carry existing browser data across automatically.
+          // The canonical publication URL remains the isolated app address.
+          const legacy = config.storageKeys.get(slug)?.length && config.legacyOrigins.find(origin => new URL(origin).hostname === new URL(url).hostname);
+          entries.set(slug, { slug, kind: 'site', name: slug.replaceAll('-', ' '), description: 'Published with TailNow', ...config.siteMetadata.get(slug), url, launchUrl: legacy ? `${legacy}/${slug}/` : url, shutdown: { type: 'tailnow' } });
         }
         this.config = config;
         this.entries = entries;
